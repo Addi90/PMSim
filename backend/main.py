@@ -24,21 +24,22 @@ class PowerMeterSimulation:
         self.simulation_thread = None
 
     def get_voltage(self) -> Tuple[float, float, float]:
-        return tuple(self.voltage)
-
+        return tuple([round(i, 2) for i in self.voltage])
+    
     def set_voltage(self, v1: float, v2: float, v3: float):
         self.voltage = [v1, v2, v3]
 
     def get_current(self) -> Tuple[float, float, float]:
-        return tuple(self.current)
-
+        return tuple([round(i, 2) for i in self.current])   
+    
     def set_current(self, i1: float, i2: float, i3: float):
         self.current = [i1, i2, i3]
 
     def get_power(self) -> Tuple[float, float, float]:
-        return tuple(self.power)
+        return tuple([round(i, 2) for i in self.power])
 
     def set_power(self, p1: float, p2: float, p3: float):
+        print(p1, p2, p3)
         self.power = [p1, p2, p3]
 
     def get_serial_number(self) -> str:
@@ -79,8 +80,8 @@ class PowerMeterSimulation:
                 pass
             elif self.simulation_type == "fluctuating":
                 for i in range(3):
-                    self.voltage[i] *= random.uniform(0.95, 1.05)
-                    self.current[i] *= random.uniform(0.9, 1.1)
+                    self.voltage[i] = self.voltage[i] * random.uniform(0.95, 1.05)
+                    self.current[i] = self.current[i] * random.uniform(0.95, 1.05)
                     self.power[i] = self.voltage[i] * self.current[i]
             elif self.simulation_type == "overload":
                 for i in range(3):
@@ -95,11 +96,11 @@ class PowerMeterSimulation:
 
     def get_data(self):
         return {
-            "voltage": self.voltage,
-            "current": self.current,
-            "power": self.power,
-            "serialNumber": self.serial_number,
-            "brand": self.brand,
+            "voltage": self.get_voltage(),
+            "current": self.get_current(),
+            "power": self.get_power(),
+            "serialNumber": self.get_serial_number(),
+            "brand": self.get_brand(),
             "isRunning": self.is_running,
             "simulationType": self.simulation_type,
             "id": self.id,
