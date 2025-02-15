@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PowerMeterData, Phase, Domain, SimulationType, SimulatorInstance } from './types';
   import { getMeterData, setVoltage, setCurrent, setPower, setSerialNumber, setBrand, setSimulationType, setSimulationState } from './api';
+  import { onMount } from 'svelte';
   import PhaseCard from './PhaseCard.svelte';
 
   export let simulator: SimulatorInstance;
@@ -27,6 +28,14 @@
     { value: 'overload', label: 'Overload' },
     { value: 'brownout', label: 'Brownout' }
   ];
+
+  // call refreshData() when the component is mounted and refresh every second
+  onMount(async () => {
+    await refreshData();
+    setInterval(async () => {
+      await refreshData();
+    }, 1000);
+  });
 
   async function refreshData() {
     meterData = await getMeterData(simulator.id);
@@ -132,8 +141,6 @@
     }
   }
 
-  // Initial data load
-  refreshData();
 </script>
 
 <div class="glass p-6 rounded-lg mb-8">
@@ -170,10 +177,11 @@
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <div>
-      <label class="block text-sm font-medium text-gray-200">
+      <label for="serial-number" class="block text-sm font-medium text-gray-200">
         Serial Number (7 digits)
       </label>
       <input
+        id="serial-number"
         type="text"
         maxlength="7"
         pattern="\d*"
@@ -182,26 +190,13 @@
         on:input={handleSerialNumberChange}
       />
     </div>
-    
-    <div>
-      <label class="block text-sm font-medium text-gray-200">
-        Brand
-      </label>
-      <select
-        class="mt-1 block w-full rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-        value={tempBrand}
-        on:change={handleBrandChange}
-      >
-        <option value="Brand1">Brand 1</option>
-        <option value="Brand2">Brand 2</option>
-      </select>
-    </div>
 
     <div>
-      <label class="block text-sm font-medium text-gray-200">
+      <label for="edit-mode" class="block text-sm font-medium text-gray-200">
         Edit Mode
       </label>
       <select
+        id="edit-mode"
         class="mt-1 block w-full rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
         value={selectedDomain}
         on:change={handleDomainChange}
