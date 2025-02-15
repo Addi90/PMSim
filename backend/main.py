@@ -1,15 +1,27 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import urllib.parse
+import random
+import threading
+import time
+import uuid
+import os
+
+CONFIG_FILE = "simulator_config.json"
 
 class PowerMeterSimulation:
-    def __init__(self):
+    def __init__(self, protocol: str):
+        self.id = str(uuid.uuid4())
+        self.protocol = protocol
         self.voltage = [230.0, 230.0, 230.0]
         self.current = [1.0, 1.0, 1.0]
         self.power = [230.0, 230.0, 230.0]
         self.serial_number = "1234567"
         self.brand = "Brand1"
+        self.is_running = False
+        self.simulation_type = "steady"
+        self.simulation_thread = None
 
     def get_voltage(self) -> Tuple[float, float, float]:
         return tuple(self.voltage)
@@ -45,7 +57,113 @@ class PowerMeterSimulation:
             raise ValueError("Invalid brand")
         self.brand = brand
 
-simulation = PowerMeterSimulation()
+    def set_simulation_type(self, sim_type: str):
+        if sim_type not in ["steady", "fluctuating", "overload", "brownout"]:
+            raise ValueError("Invalid simulation type")
+        self.simulation_type = sim_type
+
+    def set_simulation_state(self, is_running: bool):
+        self.is_running = is_running
+        if is_running and not self.simulation_thread:
+            self.simulation_thread = threading.Thread(target=self.run_simulation)
+            self.simulation_thread.daemon = True
+            self.simulation_thread.start()
+
+    def run_simulation(self):
+        while True:
+            if not self.is_running:
+                self.simulation_thread = None
+                break
+
+            if self.simulation_type == "steady":
+                pass
+            elif self.simulation_type == "fluctuating":
+                for i in range(3):
+                    self.voltage[i] *= random.uniform(0.95, 1.05)
+                    self.current[i] *= random.uniform(0.9, 1.1)
+                    self.power[i] = self.voltage[i] * self.current[i]
+            elif self.simulation_type == "overload":
+                for i in range(3):
+                    self.current[i] *= 1.01
+                    self.power[i] = self.voltage[i] * self.current[i]
+            elif self.simulation_type == "brownout":
+                for i in range(3):
+                    self.voltage[i] *= 0.99
+                    self.power[i] = self.voltage[i] * self.current[i]
+
+            time.sleep(1)
+
+    def get_data(self):
+        return {
+            "voltage": self.voltage,
+            "current": self.current,
+            "power": self.power,
+            "serialNumber": self.serial_number,
+            "brand": self.brand,
+            "isRunning": self.is_running,
+            "simulationType": self.simulation_type,
+            "id": self.id,
+            "protocol": self.protocol
+        }
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "protocol": self.protocol,
+            "serialNumber": self.serial_number,
+            "brand": self.brand,
+            "isRunning": self.is_running,
+            "simulationType": self.simulation_type
+        }
+
+class SimulatorManager:
+    def __init__(self):
+        self.simulators: Dict[str, PowerMeterSimulation] = {}
+        self.load_config()
+
+    def load_config(self):
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                for instance in config['instances']:
+                    simulator = PowerMeterSimulation(instance['protocol'])
+                    simulator.id = instance['id']
+                    simulator.serial_number = instance['serialNumber']
+                    simulator.brand = instance['brand']
+                    simulator.simulation_type = instance['simulationType']
+                    self.simulators[simulator.id] = simulator
+
+    def save_config(self):
+        config = {
+            'instances': [sim.to_dict() for sim in self.simulators.values()]
+        }
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f)
+
+    def add_simulator(self, protocol: str) -> str:
+        simulator = PowerMeterSimulation(protocol)
+        self.simulators[simulator.id] = simulator
+        self.save_config()
+        return simulator.id
+
+    def remove_simulator(self, simulator_id: str):
+        if simulator_id in self.simulators:
+            simulator = self.simulators[simulator_id]
+            simulator.set_simulation_state(False)
+            del self.simulators[simulator_id]
+            self.save_config()
+
+    def get_simulator(self, simulator_id: str) -> PowerMeterSimulation:
+        return self.simulators.get(simulator_id)
+
+    def reset(self):
+        for simulator in list(self.simulators.values()):
+            simulator.set_simulation_state(False)
+        self.simulators.clear()
+        if os.path.exists(CONFIG_FILE):
+            os.remove(CONFIG_FILE)
+
+simulator_manager = SimulatorManager()
 
 class RequestHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -54,48 +172,106 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == '/meter-data':
+        if self.path == '/config':
             self.send_response(200)
             self.send_cors_headers()
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             
-            data = {
-                "voltage": simulation.get_voltage(),
-                "current": simulation.get_current(),
-                "power": simulation.get_power(),
-                "serialNumber": simulation.get_serial_number(),
-                "brand": simulation.get_brand()
+            config = {
+                'instances': [sim.to_dict() for sim in simulator_manager.simulators.values()]
             }
-            self.wfile.write(json.dumps(data).encode())
+            self.wfile.write(json.dumps(config).encode())
+        elif self.path.startswith('/simulator/'):
+            simulator_id = self.path.split('/')[-1]
+            simulator = simulator_manager.get_simulator(simulator_id)
+            if simulator:
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(simulator.get_data()).encode())
+            else:
+                self.send_error(404)
         else:
             self.send_error(404)
 
     def do_POST(self):
         content_length = int(self.headers.get('Content-Length', 0))
         post_data = self.rfile.read(content_length)
-        data = json.loads(post_data)
-
+        
         try:
-            if self.path == '/voltage':
-                simulation.set_voltage(*data['values'])
-            elif self.path == '/current':
-                simulation.set_current(*data['values'])
-            elif self.path == '/power':
-                simulation.set_power(*data['values'])
-            elif self.path == '/serial-number':
-                simulation.set_serial_number(data['serialNumber'])
-            elif self.path == '/brand':
-                simulation.set_brand(data['brand'])
+            data = json.loads(post_data)
+            
+            if self.path == '/simulator':
+                simulator_id = simulator_manager.add_simulator(data['protocol'])
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"id": simulator_id}).encode())
+            elif self.path == '/config/reset':
+                simulator_manager.reset()
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success"}).encode())
+            elif self.path.startswith('/simulator/'):
+                parts = self.path.split('/')
+                simulator_id = parts[2]
+                action = parts[3] if len(parts) > 3 else None
+                
+                simulator = simulator_manager.get_simulator(simulator_id)
+                if not simulator:
+                    self.send_error(404)
+                    return
+
+                if action == 'voltage':
+                    simulator.set_voltage(*data['values'])
+                elif action == 'current':
+                    simulator.set_current(*data['values'])
+                elif action == 'power':
+                    simulator.set_power(*data['values'])
+                elif action == 'serial-number':
+                    simulator.set_serial_number(data['serialNumber'])
+                elif action == 'brand':
+                    simulator.set_brand(data['brand'])
+                elif action == 'simulation-type':
+                    simulator.set_simulation_type(data['type'])
+                elif action == 'simulation-state':
+                    simulator.set_simulation_state(data['isRunning'])
+                else:
+                    self.send_error(400)
+                    return
+
+                simulator_manager.save_config()
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success"}).encode())
             else:
                 self.send_error(404)
-                return
-
-            self.send_response(200)
+        except Exception as e:
+            self.send_response(400)
             self.send_cors_headers()
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({"status": "success"}).encode())
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def do_DELETE(self):
+        try:
+            if self.path.startswith('/simulator/'):
+                simulator_id = self.path.split('/')[-1]
+                simulator_manager.remove_simulator(simulator_id)
+                self.send_response(200)
+                self.send_cors_headers()
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success"}).encode())
+            else:
+                self.send_error(404)
         except Exception as e:
             self.send_response(400)
             self.send_cors_headers()
@@ -115,5 +291,6 @@ if __name__ == "__main__":
     try:
         server.serve_forever()
     except KeyboardInterrupt:
+        simulator_manager.reset()
         server.server_close()
         print("Server stopped.")

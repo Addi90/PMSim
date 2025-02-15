@@ -4,6 +4,7 @@ export interface PowerMeterData {
   power: [number, number, number];
   serialNumber: string;
   brand: 'Brand1' | 'Brand2';
+  isRunning: boolean;
 }
 
 export interface Phase {
@@ -13,3 +14,20 @@ export interface Phase {
 }
 
 export type Domain = 'power' | 'voltage' | 'current';
+
+export type SimulationType = 'steady' | 'fluctuating' | 'overload' | 'brownout';
+
+export type SimulatorProtocol = 'ModbusRTU' | 'ModbusTCP';
+
+export interface SimulatorInstance {
+  id: string;
+  protocol: SimulatorProtocol;
+  serialNumber: string;
+  brand: 'Brand1' | 'Brand2';
+  isRunning: boolean;
+  simulationType: SimulationType;
+}
+
+export interface SimulatorConfig {
+  instances: SimulatorInstance[];
+}

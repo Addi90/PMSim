@@ -1,0 +1,1 @@
+{"instances": [{"id": "62d6054a-a7e9-40ee-9abb-2cffb0bf7052", "protocol": "ModbusRTU", "serialNumber": "1234567", "brand": "Brand2", "isRunning": true, "simulationType": "brownout"}, {"id": "135d6ec7-1fb3-4b1c-bdd9-f90eb5cbd27f", "protocol": "ModbusTCP", "serialNumber": "1234567", "brand": "Brand2", "isRunning": true, "simulationType": "fluctuating"}]}
