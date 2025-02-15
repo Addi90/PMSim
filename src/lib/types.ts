@@ -11,3 +11,5 @@ export interface Phase {
   current: number;
   power: number;
 }
+
+export type Domain = 'power' | 'voltage' | 'current';

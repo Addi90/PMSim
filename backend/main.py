@@ -1,21 +1,8 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import json
 from typing import List, Tuple
+import urllib.parse
 
-app = FastAPI()
-
-# Enable CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# This is where you would import your actual power meter simulation
-# For now, we'll create a mock class
 class PowerMeterSimulation:
     def __init__(self):
         self.voltage = [230.0, 230.0, 230.0]
@@ -58,68 +45,75 @@ class PowerMeterSimulation:
             raise ValueError("Invalid brand")
         self.brand = brand
 
-# Initialize simulation
 simulation = PowerMeterSimulation()
 
-class ValuesPayload(BaseModel):
-    values: List[float]
+class RequestHandler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_cors_headers()
+        self.end_headers()
 
-class SerialNumberPayload(BaseModel):
-    serialNumber: str
+    def do_GET(self):
+        if self.path == '/meter-data':
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            
+            data = {
+                "voltage": simulation.get_voltage(),
+                "current": simulation.get_current(),
+                "power": simulation.get_power(),
+                "serialNumber": simulation.get_serial_number(),
+                "brand": simulation.get_brand()
+            }
+            self.wfile.write(json.dumps(data).encode())
+        else:
+            self.send_error(404)
 
-class BrandPayload(BaseModel):
-    brand: str
+    def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length)
+        data = json.loads(post_data)
 
-@app.get("/meter-data")
-async def get_meter_data():
-    return {
-        "voltage": simulation.get_voltage(),
-        "current": simulation.get_current(),
-        "power": simulation.get_power(),
-        "serialNumber": simulation.get_serial_number(),
-        "brand": simulation.get_brand()
-    }
+        try:
+            if self.path == '/voltage':
+                simulation.set_voltage(*data['values'])
+            elif self.path == '/current':
+                simulation.set_current(*data['values'])
+            elif self.path == '/power':
+                simulation.set_power(*data['values'])
+            elif self.path == '/serial-number':
+                simulation.set_serial_number(data['serialNumber'])
+            elif self.path == '/brand':
+                simulation.set_brand(data['brand'])
+            else:
+                self.send_error(404)
+                return
 
-@app.post("/voltage")
-async def update_voltage(payload: ValuesPayload):
-    try:
-        simulation.set_voltage(*payload.values)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "success"}).encode())
+        except Exception as e:
+            self.send_response(400)
+            self.send_cors_headers()
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
 
-@app.post("/current")
-async def update_current(payload: ValuesPayload):
-    try:
-        simulation.set_current(*payload.values)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/power")
-async def update_power(payload: ValuesPayload):
-    try:
-        simulation.set_power(*payload.values)
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/serial-number")
-async def update_serial_number(payload: SerialNumberPayload):
-    try:
-        simulation.set_serial_number(payload.serialNumber)
-        return {"status": "success"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/brand")
-async def update_brand(payload: BrandPayload):
-    try:
-        simulation.set_brand(payload.brand)
-        return {"status": "success"}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    def send_cors_headers(self):
+        self.send_header('Access-Control-Allow-Origin', 'http://localhost:5173')
+        self.send_header('Access-Control-Allow-Methods', '*')
+        self.send_header('Access-Control-Allow-Headers', '*')
+        self.send_header('Access-Control-Allow-Credentials', 'true')
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    server = HTTPServer(('localhost', 8000), RequestHandler)
+    print("Server started at http://localhost:8000")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        server.server_close()
+        print("Server stopped.")
