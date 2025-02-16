@@ -30,11 +30,18 @@
   ];
 
   // call refreshData() when the component is mounted and refresh every second
-  onMount(async () => {
-    await refreshData();
-    setInterval(async () => {
-      await refreshData();
+  onMount(() => {
+    refreshData();
+    const interval = setInterval(() => {
+      if (!hasPhaseChanges && !hasSettingChanges) {
+        refreshData();
+      }
     }, 1000);
+
+    // Return the cleanup function directly, not in a Promise
+    return () => {
+      clearInterval(interval);
+    };
   });
 
   async function refreshData() {
@@ -45,6 +52,8 @@
   }
 
   function updatePhases() {
+  // Only update if there are no pending changes
+  if (!hasPhaseChanges) {
     phases = meterData.voltage.map((_, i) => ({
       voltage: meterData.voltage[i],
       current: meterData.current[i],
@@ -52,6 +61,7 @@
     }));
     tempValues = [...meterData[selectedDomain]];
   }
+}
 
   function handlePhaseUpdate(phaseIndex: number, value: number) {
     tempValues[phaseIndex] = value;
@@ -95,29 +105,42 @@
   }
 
   async function applyChanges() {
-    if ((!hasPhaseChanges && !hasSettingChanges) || isLoading) return;
+  if ((!hasPhaseChanges && !hasSettingChanges) || isLoading) return;
 
-    try {
-      isLoading = true;
-      
-      if (hasPhaseChanges) {
-        switch (selectedDomain) {
-          case 'voltage':
-            await setVoltage(simulator.id, tempValues);
-            meterData.voltage = [...tempValues];
-            break;
-          case 'current':
-            await setCurrent(simulator.id, tempValues);
-            meterData.current = [...tempValues];
-            break;
-          case 'power':
-            await setPower(simulator.id, tempValues);
-            meterData.power = [...tempValues];
-            break;
-        }
+  try {
+    isLoading = true;
+    
+    if (hasPhaseChanges) {
+      switch (selectedDomain) {
+        case 'voltage':
+          await setVoltage(simulator.id, tempValues);
+          // Update local state immediately
+          phases = phases.map((phase, i) => ({
+            ...phase,
+            voltage: tempValues[i]
+          }));
+          meterData.voltage = [...tempValues];
+          break;
+        case 'current':
+          await setCurrent(simulator.id, tempValues);
+          phases = phases.map((phase, i) => ({
+            ...phase,
+            current: tempValues[i]
+          }));
+          meterData.current = [...tempValues];
+          break;
+        case 'power':
+          await setPower(simulator.id, tempValues);
+          phases = phases.map((phase, i) => ({
+            ...phase,
+            power: tempValues[i]
+          }));
+          meterData.power = [...tempValues];
+          break;
       }
+    }
 
-      if (hasSettingChanges) {
+    if (hasSettingChanges) {
         if (tempSerialNumber !== meterData.serialNumber) {
           await setSerialNumber(simulator.id, tempSerialNumber);
           meterData.serialNumber = tempSerialNumber;
@@ -130,42 +153,59 @@
         }
       }
       
+      setTimeout(async () => {
       await refreshData();
-      hasPhaseChanges = false;
-      hasSettingChanges = false;
-    } catch (error) {
-      console.error('Failed to apply changes:', error);
-      await refreshData();
-    } finally {
-      isLoading = false;
-    }
+    }, 100);
+    
+    hasPhaseChanges = false;
+    hasSettingChanges = false;
+  } catch (error) {
+    console.error('Failed to apply changes:', error);
+    await refreshData();
+  } finally {
+    isLoading = false;
   }
+}
 
 </script>
 
 <div class="glass p-6 rounded-lg mb-8">
-  <div class="flex justify-between items-start mb-6">
-    <div>
-      <h2 class="text-2xl font-bold text-white">{simulator.protocol}</h2>
-      <p class="text-sm text-gray-300">ID: {simulator.id}</p>
+<!-- Replace the existing controls div with this -->
+<div class="flex justify-between items-start mb-6 flex-col sm:flex-row gap-4">
+  <div>
+    <h2 class="text-2xl font-bold text-white">{simulator.protocol}</h2>
+    <p class="text-sm text-gray-300">ID: {simulator.id}</p>
+  </div>
+  
+  <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+    <div class="flex items-center">
+      <span 
+        class="status-indicator {simulator.isRunning ? 'running' : 'stopped'}"
+        title={simulator.isRunning ? 'Simulator Running' : 'Simulator Stopped'}
+      ></span>
+      <span class="text-sm text-gray-300 mr-2">
+        {simulator.isRunning ? 'Running' : 'Stopped'}
+      </span>
     </div>
-    <div class="flex items-center gap-4">
-      <select
-        class="rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-        value={simulator.simulationType}
-        on:change={handleSimulationTypeChange}
-      >
-        {#each simulationTypes as type}
-          <option value={type.value}>{type.label}</option>
-        {/each}
-        
-      </select>
+    
+    <select
+      class="rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 min-w-[150px]"
+      value={simulator.simulationType}
+      on:change={handleSimulationTypeChange}
+    >
+      {#each simulationTypes as type}
+        <option value={type.value}>{type.label}</option>
+      {/each}
+    </select>
+    
+    <div class="flex gap-2 flex-wrap">
       <button
         class="px-4 h-10 {simulator.isRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'} text-white font-semibold rounded-none transition-colors duration-200 glass"
         on:click={toggleSimulation}
       >
         {simulator.isRunning ? 'Stop' : 'Start'}
       </button>
+      
       <button
         class="px-4 h-10 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-none transition-colors duration-200 glass"
         on:click={() => onRemove(simulator.id)}
@@ -174,6 +214,7 @@
       </button>
     </div>
   </div>
+</div>
 
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
     <div>
