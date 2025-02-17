@@ -17,11 +17,17 @@
     <div>
       <label class="block text-sm font-medium text-gray-200">{selectedDomain.charAt(0).toUpperCase() + selectedDomain.slice(1)} ({unit})</label>
       <input
-        type="number"
-        class="mt-1 block w-full rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
-        value={value}
-        on:input={(e) => onUpdate(parseFloat(e.currentTarget.value))}
-      />
+      type="text"
+      pattern="-?\d+(\.\d+)?"
+      class="mt-1 block w-full rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
+      value={value}
+      on:input={(e) => {
+        const rawValue = e.currentTarget.value;
+        if (/^-?\d*\.?\d*$/.test(rawValue)) {
+          onUpdate(parseFloat(rawValue));
+        }
+      }}
+    />
     </div>
     
     <div class="grid grid-cols-3 gap-4">
