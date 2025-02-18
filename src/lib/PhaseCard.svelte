@@ -15,8 +15,9 @@
   
   <div class="space-y-4">
     <div>
-      <label class="block text-sm font-medium text-gray-200">{selectedDomain.charAt(0).toUpperCase() + selectedDomain.slice(1)} ({unit})</label>
+      <label for="input-value" class="block text-sm font-medium text-gray-200">{selectedDomain.charAt(0).toUpperCase() + selectedDomain.slice(1)} ({unit})</label>
       <input
+      id="input-value"
       type="text"
       pattern="-?\d+(\.\d+)?"
       class="mt-1 block w-full rounded-none bg-gray-800 border-gray-700 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500"
