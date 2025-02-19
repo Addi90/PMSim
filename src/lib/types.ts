@@ -4,6 +4,7 @@ export interface PowerMeterData {
   power: [number, number, number];
   serialNumber: string;
   brand: 'Brand1' | 'Brand2';
+  port: string;
   isRunning: boolean;
 }
 
@@ -24,6 +25,7 @@ export interface SimulatorInstance {
   protocol: SimulatorProtocol;
   serialNumber: string;
   brand: 'Brand1' | 'Brand2';
+  port: string
   isRunning: boolean;
   simulationType: SimulationType;
 }
