@@ -7,8 +7,8 @@ from abstract_simulation import AbstractSimulation
 class DummyPowerMeterSimulation(AbstractSimulation):
     def __init__(self, protocol: str):
         super().__init__(protocol)
-        if protocol != "dummy":
-            raise ValueError(f"DummyPowerMeterSimulation only supports 'dummy' protocol, not '{protocol}'")
+        #if protocol != "dummy":
+        #    raise ValueError(f"DummyPowerMeterSimulation only supports 'dummy' protocol, not '{protocol}'")
 
     def run_simulation(self):
         while self.is_running:

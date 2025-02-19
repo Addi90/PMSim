@@ -1,9 +1,7 @@
 import json
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Dict
-from dummy_power_meter_simulation import DummyPowerMeterSimulation
+from http.server import BaseHTTPRequestHandler
 from simulation_manager import SimulationManager
-from abstract_simulation import AbstractSimulation
+import helpers
 
 simulation_manager = SimulationManager()
 
@@ -35,6 +33,12 @@ class RequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps(simulator.get_data()).encode())
             else:
                 self.send_error(404)
+        elif self.path == '/serial':
+            self.send_response(200)
+            self.send_cors_headers()
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"devices": helpers.list_serial_interfaces()}).encode())
         else:
             self.send_error(404)
 
@@ -79,6 +83,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                     simulator.set_serial_number(data['serialNumber'])
                 elif action == 'brand':
                     simulator.set_brand(data['brand'])
+                elif action == 'port':
+                    simulator.set_port(data['port'])
                 elif action == 'simulation-type':
                     simulator.set_simulation_type(data['type'])
                 elif action == 'simulation-state':

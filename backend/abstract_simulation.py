@@ -1,4 +1,3 @@
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Tuple
 import threading
 import uuid
@@ -14,6 +13,7 @@ class AbstractSimulation(ABC):
         self.power = [230.0, 230.0, 230.0]
         self.serial_number = "1234567"
         self.brand = "Brand1"
+        self.port = ""
         self.is_running = False
         self.simulation_type = "steady"
         self.simulation_thread = None
@@ -51,11 +51,21 @@ class AbstractSimulation(ABC):
 
     def get_brand(self) -> str:
         return self.brand
-
+    
     def set_brand(self, brand: str):
         if brand not in ["Brand1", "Brand2"]:
             raise ValueError("Invalid brand")
         self.brand = brand
+
+    def get_port(self) -> str:
+        return self.port
+    
+    def set_port(self, port: str):
+        self.port = port
+        # restart the simulation if it is running
+        if self.is_running:
+            self.set_simulation_state(False)
+            self.set_simulation_state(True)
 
     def set_simulation_type(self, sim_type: str):
         if sim_type not in ["steady", "fluctuating", "overload", "brownout"]:
@@ -84,6 +94,7 @@ class AbstractSimulation(ABC):
             "power": self.get_power(),
             "serialNumber": self.get_serial_number(),
             "brand": self.get_brand(),
+            "port": self.get_port(),
             "isRunning": self.is_running,
             "simulationType": self.simulation_type,
             "id": self.id,
@@ -95,7 +106,7 @@ class AbstractSimulation(ABC):
             "id": self.id,
             "protocol": self.protocol,
             "serialNumber": self.serial_number,
-            "brand": self.brand,
+            "port": self.get_port(),
             "isRunning": self.is_running,
             "simulationType": self.simulation_type
         }
