@@ -18,7 +18,7 @@ class SimulationManager:
                 config = json.load(f)
                 for instance in config['instances']:
                     protocol = instance['protocol']
-                    if protocol == 'dummy': # Select simulation class based on protocol
+                    if protocol == 'ModbusMTU' or 'ModbusTCP': # Select simulation class based on protocol
                         simulator = DummyPowerMeterSimulation(protocol)
                     else:
                         # Default to dummy if protocol is unknown, or handle error as needed
@@ -39,12 +39,12 @@ class SimulationManager:
             json.dump(config, f)
 
     def add_simulator(self, protocol: str) -> str:
-        if protocol == 'dummy': # Select simulation class based on protocol
+        if protocol == 'ModbusMTU' or 'ModbusTCP': # Select simulation class based on protocol
             simulator = DummyPowerMeterSimulation(protocol)
         else:
             # Default to dummy if protocol is unknown, or handle error as needed
             simulator = DummyPowerMeterSimulation("dummy") # Or raise an error
-            print(f"Warning: Unknown protocol '{protocol}', defaulting to dummy simulation.")
+            print(f"Warning: Unknown protocol '{protocol}' in config, defaulting to dummy simulation.")
 
         self.simulators[simulator.id] = simulator
         self.save_config()

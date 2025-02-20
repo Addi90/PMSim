@@ -85,3 +85,11 @@ export async function setSimulationState(simulatorId: string, isRunning: boolean
     body: JSON.stringify({ isRunning }),
   });
 }
+
+export async function setSimulationPort(simulatorId: string, port: string): Promise<void> {
+  await fetch(`${API_BASE}/simulator/${simulatorId}/port`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ port }),
+  });
+}
